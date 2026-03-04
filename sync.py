@@ -91,6 +91,7 @@ class Immich:
         favorite: bool = None,
         person_ids: List[str] = None,
         tag_ids: List[str] = None,
+        type: Union[str, List[str]] = None,
         page: int = None
     ):
         search_params = {
@@ -116,6 +117,8 @@ class Immich:
             search_params["personIds"] = person_ids
         if tag_ids:
             search_params["tagIds"] = tag_ids
+        if type:
+            search_params["type"] = type
         if page:
             search_params["page"] = page
 
@@ -216,6 +219,33 @@ def normalize_query_tags(query: Dict, tag_mapping: Dict[str, str]):
     query.pop("tags", None)
 
 
+def normalize_query_any_people(query: Dict, people_mapping: Dict[str, str]):
+    if "any_people" not in query:
+        return
+
+    if "people" in query:
+        raise ValueError("Cannot use 'people' (AND logic) and 'any_people' (OR logic) simultaneously in the same query block.")
+
+    any_people = query["any_people"]
+    if not isinstance(any_people, list):
+        any_people = [any_people]
+
+    any_person_ids = [
+        person
+        if is_valid_uuid(person) else people_mapping.get(person, None)
+        for person in any_people
+    ]
+
+    if None in any_person_ids:
+        invalid_people_names = [
+            any_people[idx] for idx, name_or_id in enumerate(any_person_ids) if not name_or_id
+        ]
+        raise ValueError(f"The following names in 'any_people' do not exist in Immich: {invalid_people_names}")
+
+    query["any_person_ids"] = any_person_ids
+    query.pop("any_people", None)
+
+
 def config_query_to_search_queries(query: Dict) -> Iterable[Dict]:
     # use 'None' as default to simplify the product operation below
     query_countries = query.pop("country", [None])
@@ -241,8 +271,10 @@ def config_query_to_search_queries(query: Dict) -> Iterable[Dict]:
     if not query_timespans:
         query_timespans.append({"before": None, "after": None})
 
+    any_person_ids = query.pop("any_person_ids", [None])
+
     # for r in itertools.product(a, b): print r[0] + r[1]
-    for p in itertools.product(query_countries, query_timespans):
+    for p in itertools.product(query_countries, query_timespans, any_person_ids):
         subquery = {
             "country": p[0],
             # unpack 'before' and 'after'
@@ -250,6 +282,9 @@ def config_query_to_search_queries(query: Dict) -> Iterable[Dict]:
             # unpack all other options, e.g. 'favorite'
             **query,
         }
+
+        if p[2] is not None:
+             subquery["person_ids"] = [p[2]]
 
         yield subquery
 
@@ -303,6 +338,7 @@ def sync_albums(args):
         query = config["query"]
         normalize_query_people(query, people_name_to_id)
         normalize_query_tags(query, tag_value_to_id)
+        normalize_query_any_people(query, people_name_to_id)
 
         people_strict_mode = query.pop("people_strict_mode", False)
         person_ids = query.get("person_ids", None)
