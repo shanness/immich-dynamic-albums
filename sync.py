@@ -91,7 +91,6 @@ class Immich:
         favorite: bool = None,
         person_ids: List[str] = None,
         tag_ids: List[str] = None,
-        type: Union[str, List[str]] = None,
         page: int = None
     ):
         search_params = {
@@ -117,8 +116,6 @@ class Immich:
             search_params["personIds"] = person_ids
         if tag_ids:
             search_params["tagIds"] = tag_ids
-        if type:
-            search_params["type"] = type
         if page:
             search_params["page"] = page
 

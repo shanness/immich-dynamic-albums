@@ -86,13 +86,6 @@ Besides few standard configuration options (such as Immich URL and API key), the
         }
     },
     {
-        # Search by asset type (IMAGE, VIDEO, AUDIO, OTHER)
-        "name": "All my videos",
-        "query": {
-            "type": "VIDEO"
-        }
-    },
-    {
         # Search for assets containing ANY of the specified people (OR logic)
         "name": "Me or Wife",
         "query": {
